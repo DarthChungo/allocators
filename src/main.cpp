@@ -1,122 +1,54 @@
 #include <iostream>
-#include <cstddef>
+#include <cstring>
 #include <cstdlib>
 #include <cassert>
+#include <cstddef>
 
-struct AllocatorRecord {
-  AllocatorRecord* next = nullptr;
-  void*            ptr  = nullptr;
-  bool             used = false;
-  std::size_t      size = 0;
-};
-
-class LinkedListAllocator {
+class InlineHeaderAllocator {
  public:
-  LinkedListAllocator(void* base_ptr, std::size_t size) {
-    max_records = size / (sizeof(AllocatorRecord) + 1);
-
-    records       = (AllocatorRecord*)base_ptr;
-    records->size = max_records;
-    records->ptr  = (uint8_t*)base_ptr + (max_records * sizeof(AllocatorRecord));
-  }
-
-  ~LinkedListAllocator() {}
+  InlineHeaderAllocator(void* start, std::size_t size) : start(start), size(size) { std::memset(start, 0, size); }
+  ~InlineHeaderAllocator() {}
 
   template <typename T>
   T* malloc() {
-    std::size_t size    = sizeof(T);
-    auto        current = records;
-
-    while (current) {
-      if (!current->used && current->size >= size) {
-        AllocatorRecord* next = current + size;
-
-        if ((std::size_t)(next - records) != max_records) {
-          next->size = current->size - size;
-          next->ptr  = (uint8_t*)current->ptr + size;
-
-          current->next = next;
-        }
-
-        current->used = true;
-        current->size = size;
-
-        return (T*)current->ptr;
-      }
-
-      current = current->next;
-    }
-
     return nullptr;
   }
 
   template <typename T>
   void free(T* record) {
     assert(record && "Invalid address nullptr");
-    AllocatorRecord* current = records;
-    AllocatorRecord* prev    = nullptr;
-
-    while (current) {
-      if (current->ptr == record && current->used) {
-        if (prev && !prev->used) {
-          current = prev;
-        }
-
-        if (auto next = current->next; next && !next->used) {
-          current->size += next->size;
-          next->size = 0;
-          next->ptr  = nullptr;
-
-          current->next = next->next;
-          next->next    = nullptr;
-        }
-
-        current->used = false;
-
-        return;
-      }
-
-      prev    = current;
-      current = current->next;
-    }
-
-    assert(false && "Trying to free an invalid record");
   }
 
   void print_records() {
-    auto current = records;
+    void* current = start;
 
-    std::cout << "\nAllocator records (this=" << this << ", max_records=" << max_records << ", records=" << records
-              << "):\n";
-
-    while (current) {
-      std::cout << "Record at address=" << current << ", ptr=" << current->ptr << ", size=" << current->size
-                << ", used=" << current->used << ", next=" << current->next << "\n";
-
-      current = current->next;
+    while (*(size_t*)current != 0) {
+      std::cout << "Record: header ptr=" << current << ", data ptr=" << ((size_t*)current + 1)
+                << ", data (as byte)=" << (int)*((uint8_t*)current + sizeof(size_t)) << "\n";
+      current = (void*)((uint8_t*)current + *(size_t*)current + sizeof(size_t));
     }
-
-    std::cout << "\n";
   }
 
  public:
-  AllocatorRecord* records     = nullptr;
-  std::size_t      max_records = 0;
+  void*       start = nullptr;
+  std::size_t size  = 0;
 };
 
 int main() {
-  LinkedListAllocator allocator(std::calloc(1024, 1), 1024);
+  InlineHeaderAllocator allocator(std::malloc(1024), 1024);
+
+  // manually test writing some records
+  *((uint8_t*)allocator.start + (0 * sizeof(size_t)) + 0) = 1;
+  *((uint8_t*)allocator.start + (1 * sizeof(size_t)) + 0) = (uint8_t)2;
+  *((uint8_t*)allocator.start + (1 * sizeof(size_t)) + 1) = 1;
+  *((uint8_t*)allocator.start + (2 * sizeof(size_t)) + 1) = (uint8_t)3;
+  *((uint8_t*)allocator.start + (2 * sizeof(size_t)) + 2) = 1;
+  *((uint8_t*)allocator.start + (3 * sizeof(size_t)) + 2) = (uint8_t)4;
+  *((uint8_t*)allocator.start + (3 * sizeof(size_t)) + 3) = 1;
+  *((uint8_t*)allocator.start + (4 * sizeof(size_t)) + 3) = (uint8_t)5;
+
   allocator.print_records();
 
-  auto a = allocator.malloc<uint8_t>();
-  auto b = allocator.malloc<uint8_t>();
-
-  allocator.print_records();
-
-  allocator.free(b);
-  allocator.free(a);
-
-  allocator.print_records();
-  std::free((void*)allocator.records);
+  std::free((void*)allocator.start);
   return 0;
 }
