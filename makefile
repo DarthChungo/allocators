@@ -1,5 +1,5 @@
 CXX      := g++
-CXXFLAGS := -pedantic-errors -Wall -Wextra -std=c++17
+CXXFLAGS := -pedantic-errors -Wall -Wextra -std=c++20
 LDFLAGS  := -L/usr/lib -lstdc++ -lglfw -lrt -lm -ldl -lvulkan
 
 FLAGS_RELEASE := -Ofast -flto -Werror -DNDEBUG
