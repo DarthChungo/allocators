@@ -23,26 +23,35 @@ class InlineHeaderAllocator {
   T* malloc(size_t s = sizeof(T)) {
     void* current = start;
 
-    while (((uint8_t*)current - (uint8_t*)start) < (uint32_t)size) {
+    while (((uint8_t*)current - (uint8_t*)start) < (int32_t)size) {
       if (*(size_t*)current == 0) {
-        size_t* header   = (size_t*)current;
-        current          = ((size_t*)current + 1);
-        size_t available = 0;
+        size_t*  header    = (size_t*)current;
+        uint8_t* data      = (uint8_t*)((size_t*)current + 1);
+        uint8_t* head      = data;
+        size_t   available = 0;
 
-        while (available != s && *(uint8_t*)current == 0) {
-          current = ((uint8_t*)current + 1);
+        while (true) {
+          if (available == s) {
+            std::cout << "Found empty record: header=" << header << ", data=" << (void*)data << ", size=" << s << "\n";
+            *header = s;
+            return (T*)data;
+
+          } else if (*head != 0) {
+            current = data + available;
+            break;
+
+          } else if (head - (uint8_t*)start >= (int32_t)size) {
+            return nullptr;
+          }
+
           available++;
+          head++;
         }
 
-        if (available == s) {
-          std::cout << "Found empty record: header=" << header << ", data=" << (header + 1) << ", size=" << s << "\n";
-          *header = s;
-          return (T*)(header + 1);
-        }
+      } else {
+        current = (void*)((uint8_t*)current + *(size_t*)current + sizeof(size_t));
       }
-
-      current = (void*)((uint8_t*)current + *(size_t*)current + sizeof(size_t));
-    };
+    }
 
     return nullptr;
   }
@@ -66,7 +75,9 @@ class InlineHeaderAllocator {
       current = (void*)((uint8_t*)current + *(size_t*)current + sizeof(size_t));
     }
 
-    std::cout << "Record: header ptr=" << current << " (empty)\n\n";
+    if ((uint8_t*)current - (uint8_t*)start < size) {
+      std::cout << "Record: header=" << current << " (empty)\n\n";
+    }
   }
 
  public:
