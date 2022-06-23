@@ -62,19 +62,12 @@ class InlineHeaderAllocator {
   void free(T* record) {
     assert(record && "Invalid address nullptr");
 
-    uint8_t* current = (uint8_t*)start;
+    if (size_t* header = ((size_t*)record - 1); header != 0) {
+      std::memset(header, 0, *header + sizeof(size_t));
 
-    while ((current - (uint8_t*)start) < (int32_t)size) {
-      if (current == (uint8_t*)record) {
-        size_t* header = (size_t*)current - 1;
-        std::memset(header, 0, *header + sizeof(size_t));
-        return;
-      }
-
-      current++;
+    } else {
+      assert(false && "Passed an invalid record");
     }
-
-    assert(false && "Passed invalid record");
   }
 
   void print_records() {
@@ -82,7 +75,7 @@ class InlineHeaderAllocator {
 
     uint8_t* current = (uint8_t*)start;
 
-    while ((current - (uint8_t*)start) <= (int32_t)size) {
+    while ((current - (uint8_t*)start) < (int32_t)size) {
       if (*current != 0) {
         std::cout << "Record: header=" << (void*)current << ", data=" << (void*)(current + sizeof(size_t))
                   << ", size=" << *(size_t*)current << "\n";
@@ -107,17 +100,30 @@ int main() {
   allocator.print_records();
 
   auto a = allocator.malloc<uint8_t>();
-  auto b = allocator.malloc<uint8_t>();
+  auto b = allocator.malloc<uint32_t>();
+  auto c = allocator.malloc<uint8_t>();
 
   *a = 0xFF;
   *b = 0xFF;
+  *c = 0xFF;
 
   allocator.print_records();
+  print_memory(allocator.start, 100);
 
-  allocator.free(a);
+  // allocator.free(a);
   allocator.free(b);
+  // allocator.free(c);
+
+  auto d = allocator.malloc<uint8_t>();
+  *d     = 0xFF;
 
   allocator.print_records();
+  print_memory(allocator.start, 100);
+
+  auto e = allocator.malloc<uint8_t>();
+
+  allocator.print_records();
+  print_memory(allocator.start, 100);
 
   std::free((void*)allocator.start);
   return 0;
