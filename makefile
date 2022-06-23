@@ -16,7 +16,7 @@ SRC      := $(shell find $(SOURCE_DIR) $(INCLUDE_DIR) -type f -iname "*.cpp")
 OBJECTS  := $(SRC:%.cpp=$(OBJECT_DIR)/%.o)
 
 .NOTPARALLEL:
-.PHONY: all clean debug release run
+.PHONY: all clean debug release run gdb valgrind
 all: release
 
 $(OBJECT_DIR)/%.o: %.cpp
@@ -39,7 +39,7 @@ internal_release_prep:
 	@echo -e "[\033[34mINFO\033[0m] Doing a release build"
 	$(eval CXXFLAGS += $(FLAGS_RELEASE))
 
-internal_perform_build: $(CPCH) $(BINARY_DIR)/$(TARGET) $(FSPIRV) $(VSPIRV)
+internal_perform_build: $(BINARY_DIR)/$(TARGET)
 
 release: internal_release_prep internal_perform_build
 debug: internal_debug_prep internal_perform_build
@@ -48,6 +48,13 @@ run:
 	@echo -e "[\033[34mRUN\033[0m] $(BINARY_DIR)/$(TARGET)"
 	@cd $(BINARY_DIR); ./$(TARGET)
 
+gdb: debug
+	@echo -e "[\033[34mGDB\033[0m] $(BINARY_DIR)/$(TARGET)"
+	@gdb ./$(BINARY_DIR)/$(TARGET)
+
+valgrind: debug
+	@echo -e "[\033[34mVALGRIND\033[0m] $(BINARY_DIR)/$(TARGET)"
+	@valgrind --leak-check=full --track-origins=yes -s ./$(BINARY_DIR)/$(TARGET)
 clean:
 	@echo -e "[\033[34mINFO\033[0m] Cleaning build output"
 	-@if [ -d "$(BUILD_DIR)" ]; then rm -rfv $(BUILD_DIR) > /dev/null \
