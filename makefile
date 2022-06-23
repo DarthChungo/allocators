@@ -1,61 +1,69 @@
 CXX      := g++
 CXXFLAGS := -pedantic-errors -Wall -Wextra -std=c++20
-LDFLAGS  := -L/usr/lib -lstdc++ -lglfw -lrt -lm -ldl -lvulkan
+LDFLAGS  := -L/usr/lib -lstdc++
 
-FLAGS_RELEASE := -Ofast -flto -Werror -DNDEBUG
-FLAGS_DEBUG   := -O0 -g -D_DEBUG
+R_CXXFLAGS := -Ofast -flto -Werror -DNDEBUG
+D_CXXFLAGS := -O0 -g -D_DEBUG
 
-BUILD_DIR   := ./build
-OBJECT_DIR  := $(BUILD_DIR)
-BINARY_DIR  := $(BUILD_DIR)/bin
+TARGET      := allocators
 SOURCE_DIR  := src/
 INCLUDE_DIR := include/
+SRC         := $(shell find $(SOURCE_DIR) $(INCLUDE_DIR) -type f -iname "*.cpp")
 
-TARGET   := allocators
-SRC      := $(shell find $(SOURCE_DIR) $(INCLUDE_DIR) -type f -iname "*.cpp")
-OBJECTS  := $(SRC:%.cpp=$(OBJECT_DIR)/%.o)
+D_BUILD_DIR   := ./build
+D_OBJECT_DIR  := $(D_BUILD_DIR)
+D_BINARY_DIR  := $(D_BUILD_DIR)/bin
+D_OBJECTS  := $(SRC:%.cpp=$(D_OBJECT_DIR)/%.o)
 
-.NOTPARALLEL:
+R_BUILD_DIR   := ./release
+R_OBJECT_DIR  := $(R_BUILD_DIR)
+R_BINARY_DIR  := $(R_BUILD_DIR)/bin
+R_OBJECTS  := $(SRC:%.cpp=$(R_OBJECT_DIR)/%.o)
+
 .PHONY: all clean debug release run gdb valgrind
 all: release
 
-$(OBJECT_DIR)/%.o: %.cpp
+$(D_OBJECT_DIR)/%.o: %.cpp
 	@if [ -d "$(dir $@)" ]; then :; else mkdir -p $(dir $@) \
 	  && echo -e "[\033[34mMKDIR\033[0m] $(dir $@)"; fi
-	@$(CXX) $(CXXFLAGS) -I$(INCLUDE_DIR) -c $< -o $@ $(LDFLAGS) \
+	@$(CXX) $(CXXFLAGS) $(D_CXXFLAGS) -I$(INCLUDE_DIR) -c $< -o $@ $(LDFLAGS) \
 	  && echo -e "[\033[32mCXX\033[0m] \033[1m$^\033[0m -> \033[1m$@\033[0m"
 
-$(BINARY_DIR)/$(TARGET): $(OBJECTS)
+$(R_OBJECT_DIR)/%.o: %.cpp
 	@if [ -d "$(dir $@)" ]; then :; else mkdir -p $(dir $@) \
 	  && echo -e "[\033[34mMKDIR\033[0m] $(dir $@)"; fi
-	@$(CXX) $(CXXFLAGS) -o $(BINARY_DIR)/$(TARGET) $^ $(LDFLAGS) \
+	@$(CXX) $(CXXFLAGS) $(R_CXXFLAGS) -I$(INCLUDE_DIR) -c $< -o $@ $(LDFLAGS) \
+	  && echo -e "[\033[32mCXX\033[0m] \033[1m$^\033[0m -> \033[1m$@\033[0m"
+
+$(D_BINARY_DIR)/$(TARGET): $(D_OBJECTS)
+	@if [ -d "$(dir $@)" ]; then :; else mkdir -p $(dir $@) \
+	  && echo -e "[\033[34mMKDIR\033[0m] $(dir $@)"; fi
+	@$(CXX) $(CXXFLAGS) $(D_CXXFLAGS) -o $(D_BINARY_DIR)/$(TARGET) $^ $(LDFLAGS) \
 	  && echo -e "[\033[32mLD\033[0m] \033[1m$^\033[0m -> \033[1m$@\033[0m"
 
-internal_debug_prep:
-	@echo -e "[\033[34mINFO\033[0m] Doing a debug build"
-	$(eval CXXFLAGS += $(FLAGS_DEBUG))
+$(R_BINARY_DIR)/$(TARGET): $(R_OBJECTS)
+	@if [ -d "$(dir $@)" ]; then :; else mkdir -p $(dir $@) \
+	  && echo -e "[\033[34mMKDIR\033[0m] $(dir $@)"; fi
+	@$(CXX) $(CXXFLAGS) $(R_CXXFLAGS) -o $(R_BINARY_DIR)/$(TARGET) $^ $(LDFLAGS) \
+	  && echo -e "[\033[32mLD\033[0m] \033[1m$^\033[0m -> \033[1m$@\033[0m"
 
-internal_release_prep:
-	@echo -e "[\033[34mINFO\033[0m] Doing a release build"
-	$(eval CXXFLAGS += $(FLAGS_RELEASE))
-
-internal_perform_build: $(BINARY_DIR)/$(TARGET)
-
-release: internal_release_prep internal_perform_build
-debug: internal_debug_prep internal_perform_build
+release: $(R_BINARY_DIR)/$(TARGET)
+debug: $(D_BINARY_DIR)/$(TARGET)
 
 run:
-	@echo -e "[\033[34mRUN\033[0m] $(BINARY_DIR)/$(TARGET)"
-	@cd $(BINARY_DIR); ./$(TARGET)
+	@echo -e "[\033[34mRUN\033[0m] $(D_BINARY_DIR)/$(TARGET)"
+	@cd $(D_BINARY_DIR); ./$(TARGET)
 
 gdb: debug
-	@echo -e "[\033[34mGDB\033[0m] $(BINARY_DIR)/$(TARGET)"
-	@gdb ./$(BINARY_DIR)/$(TARGET)
+	@echo -e "[\033[34mGDB\033[0m] $(D_BINARY_DIR)/$(TARGET)"
+	@gdb ./$(D_BINARY_DIR)/$(TARGET)
 
 valgrind: debug
-	@echo -e "[\033[34mVALGRIND\033[0m] $(BINARY_DIR)/$(TARGET)"
-	@valgrind --leak-check=full --track-origins=yes -s ./$(BINARY_DIR)/$(TARGET)
+	@echo -e "[\033[34mVALGRIND\033[0m] $(D_BINARY_DIR)/$(TARGET)"
+	@valgrind --leak-check=full --track-origins=yes -s ./$(D_BINARY_DIR)/$(TARGET)
 clean:
-	@echo -e "[\033[34mINFO\033[0m] Cleaning build output"
-	-@if [ -d "$(BUILD_DIR)" ]; then rm -rfv $(BUILD_DIR) > /dev/null \
-	  && echo -e "[\033[34mRM\033[0m] $(BUILD_DIR)"; fi
+	@echo -e "[\033[34mINFO\033[0m] Cleaning build outputs"
+	-@if [ -d "$(D_BUILD_DIR)" ]; then rm -rfv $(D_BUILD_DIR) > /dev/null \
+	  && echo -e "[\033[34mRM\033[0m] $(D_BUILD_DIR)"; fi
+	-@if [ -d "$(R_BUILD_DIR)" ]; then rm -rfv $(R_BUILD_DIR) > /dev/null \
+	  && echo -e "[\033[34mRM\033[0m] $(R_BUILD_DIR)"; fi
