@@ -20,7 +20,7 @@ R_OBJECT_DIR  := $(R_BUILD_DIR)
 R_BINARY_DIR  := $(R_BUILD_DIR)/bin
 R_OBJECTS  := $(SRC:%.cpp=$(R_OBJECT_DIR)/%.o)
 
-.PHONY: all clean debug release run gdb valgrind
+.PHONY: all clean debug release debug_run release_run gdb valgrind
 all: release
 
 $(D_OBJECT_DIR)/%.o: %.cpp
@@ -50,9 +50,13 @@ $(R_BINARY_DIR)/$(TARGET): $(R_OBJECTS)
 release: $(R_BINARY_DIR)/$(TARGET)
 debug: $(D_BINARY_DIR)/$(TARGET)
 
-run:
+debug_run: debug
 	@echo -e "[\033[34mRUN\033[0m] $(D_BINARY_DIR)/$(TARGET)"
 	@cd $(D_BINARY_DIR); ./$(TARGET)
+
+release_run: release
+	@echo -e "[\033[34mRUN\033[0m] $(R_BINARY_DIR)/$(TARGET)"
+	@cd $(R_BINARY_DIR); ./$(TARGET)
 
 gdb: debug
 	@echo -e "[\033[34mGDB\033[0m] $(D_BINARY_DIR)/$(TARGET)"
