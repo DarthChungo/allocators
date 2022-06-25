@@ -20,6 +20,7 @@ void print_memory(void* start, size_t length) {
   std::cout << "\n";
 }
 
+template <typename header_t = size_t>
 class InlineHeaderAllocator {
  public:
   InlineHeaderAllocator(void* start, std::size_t size) : start(start), size(size) { std::memset(start, 0, size); }
@@ -27,15 +28,17 @@ class InlineHeaderAllocator {
 
   template <typename T = void>
   T* malloc(size_t s = sizeof(T)) {
-    size_t* current = (size_t*)start;
-    size_t  length  = (s + sizeof(size_t) - 1) / sizeof(size_t);  // in multiples of sizeof(size_t)
+    if (s > std::numeric_limits<header_t>::max() || s > size) return nullptr;
+
+    header_t* current = (header_t*)start;
+    size_t    length  = (s + sizeof(header_t) - 1) / sizeof(header_t);  // in multiples of sizeof(header_t)
 
     while ((uint8_t*)current - (uint8_t*)start < (int32_t)size) {
       if (*current == 0) {
-        size_t* header    = current;
-        size_t* data      = header + 1;
-        size_t* head      = data;
-        size_t  available = 0;
+        header_t* header    = current;
+        header_t* data      = header + 1;
+        header_t* head      = data;
+        size_t    available = 0;
 
         while (true) {
           if (available == length) {
@@ -66,8 +69,8 @@ class InlineHeaderAllocator {
   void free(T* record) {
     assert(record && "Invalid address nullptr");
 
-    if (size_t* header = ((size_t*)record - 1); header != 0) {
-      std::memset(header, 0, *header * sizeof(size_t) + sizeof(size_t));
+    if (header_t* header = ((header_t*)record - 1); header != 0) {
+      std::memset(header, 0, *header * sizeof(header_t) + sizeof(header_t));
 
     } else {
       assert(false && "Passed an invalid record");
@@ -77,12 +80,12 @@ class InlineHeaderAllocator {
   void print_records() {
     std::cout << "\nAllocator records (this=" << this << ", start=" << start << ", size=" << size << "):\n";
 
-    size_t* current = (size_t*)start;
+    header_t* current = (header_t*)start;
 
     while ((uint8_t*)current - (uint8_t*)start < (int64_t)size) {
       if (*current != 0) {
         std::cout << "Record: header=" << (void*)current << ", data=" << (void*)(current + 1)
-                  << ", size=" << sizeof(size_t) * *current << "\n";
+                  << ", size=" << sizeof(header_t) * *current << "\n";
         current = (current + *current + 1);
         continue;
       }
